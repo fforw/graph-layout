@@ -6,19 +6,23 @@ package org.oseditor.graph;
 public class GraphLayoutBuilder
     implements GraphLayoutConfig
 {
-    private int iterations = 1000;
+    private int iterations = 500;
 
-    private double stepSize = 1/100.0;
+    private double repulsionStart = 0.85;
 
-    private double springConstant = 100;
+    private double stepSize = 1/60.0;
 
-    private int initialSeed =14121970;
+    private double springConstant = 750;
+
+    private long initialSeed =14121970;
 
     private DistanceFunction distanceFunction;
 
-    private double minDistance = 0;
+    private double repulsionForce = 3000;
 
-    private double minForce = springConstant / 2;
+    private FallOffCurveDefinition springFallOff;
+
+    private FallOffCurveDefinition repulsionFallOff;
 
     @Override
     public int getIterations()
@@ -50,6 +54,18 @@ public class GraphLayoutBuilder
         return springConstant;
     }
 
+    @Override
+    public double getRepulsionForce()
+    {
+        return repulsionForce;
+    }
+
+    @Override
+    public double getRepulsionStart()
+    {
+        return repulsionStart;
+    }
+
     public GraphLayoutConfig withSpringConstant(double springConstant)
     {
         this.springConstant = springConstant;
@@ -57,12 +73,12 @@ public class GraphLayoutBuilder
     }
 
     @Override
-    public int getInitialSeed()
+    public long getInitialSeed()
     {
         return initialSeed;
     }
 
-    public GraphLayoutConfig withInitialSeed(int initialSeed)
+    public GraphLayoutConfig withInitialSeed(long initialSeed)
     {
         this.initialSeed = initialSeed;
         return this;
@@ -74,27 +90,15 @@ public class GraphLayoutBuilder
     }
 
     @Override
-    public double getMinDistance()
+    public FallOffCurveDefinition getSpringFallOff()
     {
-        return minDistance;
+        return springFallOff;
     }
 
     @Override
-    public double getMinForce()
+    public FallOffCurveDefinition getRepulsionFallOff()
     {
-        return minForce;
-    }
-
-    public GraphLayoutBuilder withMinDistance(double minDistance)
-    {
-        this.minDistance = minDistance;
-        return this;
-    }
-
-    public GraphLayoutBuilder withMinForce(double minForce)
-    {
-        this.minForce = minForce;
-        return this;
+        return repulsionFallOff;
     }
 
     public GraphLayoutBuilder withDistanceFunction(DistanceFunction distanceFunction)
@@ -103,8 +107,63 @@ public class GraphLayoutBuilder
         return this;
     }
 
+    public GraphLayoutBuilder withRepulsionStart(double repulsionStart)
+    {
+        this.repulsionStart = repulsionStart;
+        return this;
+    }
+
+    public GraphLayoutBuilder withSpringFallOff(FallOffCurveDefinition springFallOff)
+    {
+        this.springFallOff = springFallOff;
+        return this;
+    }
+
+    public GraphLayoutBuilder withSpringFallOff(double x1,double y1,double x2,double y2,double minValue, double max)
+    {
+        return withSpringFallOff(new FallOffCurveDefinition(x1,y1,x2,y2,minValue, max));
+    }
+
+    public GraphLayoutBuilder withRepulsionFallOff(FallOffCurveDefinition repulsionFallOff)
+    {
+        this.repulsionFallOff = repulsionFallOff;
+        return this;
+    }
+
+    public GraphLayoutBuilder withRepulsionFallOff(double x1,double y1,double x2,double y2,double minValue, double max)
+    {
+        return withRepulsionFallOff(new FallOffCurveDefinition(x1,y1,x2,y2,minValue, max));
+    }
+
+    public GraphLayoutBuilder withRepulsionForce(double repulsionForce)
+    {
+        this.repulsionForce = repulsionForce;
+        return this;
+    }
+
+    public GraphLayoutBuilder withRepulsionFallOffDistance(double repulsionDistance)
+    {
+        this.repulsionFallOff = new FallOffCurveDefinition(0.5,1, 0.75, 0.01, 0, repulsionDistance);
+        return this;
+    }
+
+    public GraphLayoutBuilder withSpringFallOffDistance(double springDistance)
+    {
+        this.springFallOff = new FallOffCurveDefinition(0.5, 1, 0.7, 0.5, 0.05, springDistance);
+        return this;
+    }
+
     public GraphLayout buildFor(DirectedGraph graph)
     {
+        if (repulsionFallOff == null)
+        {
+            throw new EditorRuntimeException("No repulsion fall off defined");
+        }
+        if (springFallOff == null)
+        {
+            throw new EditorRuntimeException("No spring fall off defined");
+        }
+
         return new GraphLayout(graph, this);
     }
 }

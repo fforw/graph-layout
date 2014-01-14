@@ -3,6 +3,8 @@ package org.oseditor.graph;
 import org.junit.Test;
 import org.svenson.JSONParser;
 
+import java.util.List;
+
 import static org.hamcrest.MatcherAssert.*;
 import static org.hamcrest.Matchers.*;
 
@@ -32,7 +34,7 @@ public class GraphLayoutTest
             .withDistanceFunction(new DistanceFunction()
             {
                 @Override
-                public int getDistance(GraphNode a, GraphNode b)
+                public int getDistance(GraphNode a, GraphNode b, List<Integer> edgeIndexesA, List<Integer> edgeIndexesB)
                 {
                     return 1;
                 }

@@ -11,11 +11,15 @@ public interface GraphLayoutConfig
 
     double getSpringConstant();
 
-    int getInitialSeed();
+    double getRepulsionForce();
+
+    double getRepulsionStart();
+
+    long getInitialSeed();
 
     DistanceFunction getDistanceFunction();
 
-    double getMinDistance();
+    FallOffCurveDefinition getSpringFallOff();
 
-    double getMinForce();
+    FallOffCurveDefinition getRepulsionFallOff();
 }

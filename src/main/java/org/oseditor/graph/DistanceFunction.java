@@ -1,5 +1,7 @@
 package org.oseditor.graph;
 
+import java.util.List;
+
 /**
  * Calculates the ideal distance between node a and node b.
  *
@@ -7,5 +9,5 @@ package org.oseditor.graph;
  */
 public interface DistanceFunction
 {
-    int getDistance(GraphNode a, GraphNode b);
+    int getDistance(GraphNode a, GraphNode b, List<Integer> edgeIndexesA, List<Integer> edgeIndexesB);
 }

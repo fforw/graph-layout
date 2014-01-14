@@ -11,47 +11,53 @@ import java.util.Map;
 import java.util.Random;
 
 public class GraphLayout
+    extends AbstractForceSolver
 {
     private static Logger log = LoggerFactory.getLogger(GraphLayout.class);
 
     private static final double TAU = Math.PI * 2;
-    private final GraphLayoutConfig config;
-    private final DirectedGraph data;
-    private final Random random;
-    private final int nodeCount;
+
+    final DirectedGraph data;
+    final Random random;
+    final double pushStartTime;
     String[] nodeIds;
-    State state;
-    int[][] distances;
     List<Integer>[] edges;
-    private double angle = 0;
+
+    final GraphLayoutConfig config;
+    int[][] distances;
+
+    int[] subgraph;
 
     GraphLayout(DirectedGraph data, GraphLayoutConfig cfg)
     {
+        super(data.getNodes().size(), cfg.getStepSize());
+
         if (data == null)
         {
             throw new IllegalArgumentException("data can't be null");
         }
 
-        this.config = cfg;
         this.data = data;
+        this.config = cfg;
+
+        distances = new int[nodeCount][];
+        subgraph = new int[nodeCount];
 
         this.random = new Random(cfg.getInitialSeed());
 
-        nodeCount = data.getNodes().size();
-
         nodeIds = new String[nodeCount];
-        state = new State(nodeCount);
-        distances = new int[nodeCount][];
 
         fillNodeIds();
         copyState(data.getNodes());
         fillEdges(data.getEdges());
         calculateNodeDistances();
+
+        pushStartTime = config.getIterations() * config.getStepSize() * config.getRepulsionStart();
     }
 
     private void copyState(Map<String, GraphNode> nodes)
     {
-        double[] stateData = state.getData();
+        double[] stateData = getInternalState().getData();
 
         edges = new List[nodeCount * 2];
 
@@ -113,48 +119,17 @@ public class GraphLayout
 
         GraphNode nodeA = nodes.get(nodeIds[idx]);
         GraphNode nodeB = nodes.get(nodeIds[idx2]);
-        return this.config.getDistanceFunction().getDistance(nodeA, nodeB);
+        return this.config.getDistanceFunction().getDistance(nodeA, nodeB, edges[idx], edges[idx2]);
     }
 
     private void calculateNodeDistances()
     {
-
         for (int startIndex = 0; startIndex < nodeCount; startIndex++)
         {
-            PriorityQueue queue = new PriorityQueue(nodeCount);
 
             int[] dist = new int[nodeCount];
 
-            for (int i = 0; i < nodeCount; i++)
-            {
-                int distance;
-                if (i == startIndex)
-                {
-                    distance = 0;
-                }
-                else
-                {
-                    // shortcut: if we already calculated the distances from a node,
-                    // we can just look up the distance to the current node
-                    // this doesn't reduce complexity, but at least minimizes queue
-                    // operations at minimal cost
-                    //
-                    // we have calculated the distance because when the node index is smaller
-                    // since we calculate in increasing node order
-                    if (i < startIndex)
-                    {
-                        distance = distances[i][startIndex];
-                    }
-                    else
-                    {
-                        // Unknown distance function from source to v
-                        distance = Integer.MAX_VALUE;
-                    }
-                }
-
-                dist[i] = distance;
-                queue.add(distance, i);
-            }
+            PriorityQueue queue = fillQueue(startIndex, dist);
 
 
             while (!queue.isEmpty())
@@ -169,7 +144,7 @@ public class GraphLayout
 
                 for (int toIdx : edges[index])
                 {
-                    int newDistance = dist[index] + this.getDistance(index, toIdx);
+                    int newDistance = (int) ((dist[index] * 0.999) + this.getDistance(index, toIdx));
                     int oldDistance = dist[toIdx];
                     if (newDistance < oldDistance)
                     {
@@ -181,6 +156,42 @@ public class GraphLayout
 
             distances[startIndex] = dist;
         }
+    }
+
+    private PriorityQueue fillQueue(int startIndex, int[] dist)
+    {
+        PriorityQueue queue = new PriorityQueue(nodeCount);
+        for (int i = 0; i < nodeCount; i++)
+        {
+            int distance;
+            if (i == startIndex)
+            {
+                distance = 0;
+            }
+            else
+            {
+                // shortcut: if we already calculated the distances from a node,
+                // we can just look up the distance to the current node
+                // this doesn't reduce complexity, but at least minimizes queue
+                // operations at minimal cost
+                //
+                // we have calculated the distance because when the node index is smaller
+                // since we calculate in increasing node order
+                if (i < startIndex)
+                {
+                    distance = distances[i][startIndex];
+                }
+                else
+                {
+                    // Unknown distance function from source to v
+                    distance = Integer.MAX_VALUE;
+                }
+            }
+
+            dist[i] = distance;
+            queue.add(distance, i);
+        }
+        return queue;
     }
 
     public GraphLayoutConfig getConfig()
@@ -197,7 +208,7 @@ public class GraphLayout
     public AABB update()
     {
         Map<String, GraphNode> nodes = this.data.getNodes();
-        double[] data = this.state.getData();
+        double[] data = getInternalState().getData();
 
         double minX = Double.POSITIVE_INFINITY;
         double minY = Double.POSITIVE_INFINITY;
@@ -221,105 +232,6 @@ public class GraphLayout
         }
 
         return new AABB(minX, minY, maxX - minX, maxY - minY);
-    }
-
-    /**
-     * Do one RK4 simulation step. Step size is defined by
-     * the "stepSize" option.
-     */
-    public void simulate()
-    {
-        double delta = this.config.getStepSize();
-
-        State a = new State(nodeCount);
-        State b = this.evaluate(state, delta * 0.5, a);
-        State c = this.evaluate(state, delta * 0.5, b);
-        State d = this.evaluate(state, delta, c);
-
-        b.add(c).scale(2);
-        d.add(a).add(b).scale(1.0/6);
-
-        this.state.add(d.scale(delta));
-    }
-
-    private State evaluate(State initialState, double delta, State derivative)
-    {
-        State state = derivative.clone().scale(delta).add(initialState);
-
-        return this.simulate(state, delta);
-    }
-
-    private State simulate(State state, double delta)
-    {
-        State derivative = new State(nodeCount);
-
-        if (delta == 0)
-        {
-            // Nothing happens in zero time..
-            return derivative;
-        }
-
-        double[] stateXY = state.getData();
-        double[] derivativeXY = derivative.getData();
-        for (int i = 0; i < nodeCount; i++)
-        {
-            int componentIndexI = i*2;
-
-            double nodeX = stateXY[componentIndexI];
-            double nodeY = stateXY[componentIndexI + 1];
-
-            int[] nodeDistance = distances[i];
-            for (int j = i + 1; j < nodeCount; j++)
-            {
-                int componentIndexJ = j*2;
-                double x = stateXY[componentIndexJ] - nodeX;
-                double y = stateXY[componentIndexJ + 1] - nodeY;
-
-                double distance;
-                if (x == 0 && y == 0)
-                {
-                    x = Math.cos(angle);
-                    y = Math.sin(angle);
-                    distance = 1;
-
-                    angle += 0.5;
-                }
-                else
-                {
-                    distance = Math.sqrt(x * x + y * y);
-                }
-
-                int targetDistance = nodeDistance[j];
-
-                if (targetDistance < Integer.MAX_VALUE)
-                {
-                    double force = -config.getSpringConstant() * (distance - targetDistance);
-
-                    double factorToLength = (force * delta) / distance;
-                    x *= factorToLength;
-                    y *= factorToLength;
-
-                    derivativeXY[componentIndexJ] += x;
-                    derivativeXY[componentIndexJ + 1] += y;
-
-                    derivativeXY[componentIndexI] -= x;
-                    derivativeXY[componentIndexI + 1] -= y;
-                }
-            }
-        }
-
-        return derivative;
-    }
-
-    /**
-     * Exposes the internal simulation state. Normally you should not touch this unless you want
-     * to animate the intermediary animation steps.
-     *
-     * @return
-     */
-    public State getInternalState()
-    {
-        return state;
     }
 
 
@@ -379,6 +291,102 @@ public class GraphLayout
 
 
         return sb.toString();
+    }
+
+    double[] force = new double[2];
+
+    @Override
+    protected State simulate(State state, double time, double delta)
+    {
+        State derivative = new State(nodeCount);
+
+        if (delta == 0)
+        {
+            // Nothing happens in zero time..
+            return derivative;
+        }
+
+        double[] stateXY = state.getData();
+        double[] derivativeXY = derivative.getData();
+        for (int i = 0; i < nodeCount; i++)
+        {
+            int componentIndexI = i*2;
+
+            double nodeX = stateXY[componentIndexI];
+            double nodeY = stateXY[componentIndexI + 1];
+
+            int[] nodeDistance = distances[i];
+            for (int j = i + 1; j < nodeCount; j++)
+            {
+                int componentIndexJ = j*2;
+                double x = stateXY[componentIndexJ] - nodeX;
+                double y = stateXY[componentIndexJ + 1] - nodeY;
+
+                double distance;
+                if (x == 0 && y == 0)
+                {
+                    x = Math.cos(angle)/100000;
+                    y = Math.sin(angle)/100000;
+                    distance = 0.00001;
+
+                    angle += 0.5;
+                }
+                else
+                {
+                    distance = Math.sqrt(x * x + y * y);
+                }
+
+                int targetDistance = nodeDistance[j];
+
+                double force = forces( i, j, distance, targetDistance, time);
+
+                if (force != 0)
+                {
+                    double factorToLength = (force * delta) / distance;
+                    x *= factorToLength;
+                    y *= factorToLength;
+
+                    // force
+                    derivativeXY[componentIndexJ] += x;
+                    derivativeXY[componentIndexJ + 1] += y;
+
+                    // counter-force
+                    derivativeXY[componentIndexI] -= x;
+                    derivativeXY[componentIndexI + 1] -= y;
+                }
+            }
+        }
+
+        return derivative;
+    }
+
+    private FallOffHelper fallOffHelper = new FallOffHelper();
+
+    /**
+     * The actual forces calculation.
+     *
+     * @param nodeIndexA        Node index of first node
+     * @param nodeIndexB        Node index of second node
+     * @param distance          Distance between nodes
+     * @param targetDistance    target distance according to distance calculation
+     * @param time              current time (will be a multiple of {@link GraphLayoutConfig#getStepSize()})
+     * @return force to apply to both nodes
+     */
+    protected double forces(int nodeIndexA, int nodeIndexB, double distance, int targetDistance, double time)
+    {
+        double force = 0;
+        if (targetDistance < Integer.MAX_VALUE)
+        {
+            double factor = fallOffHelper.fallOff(this.config.getSpringFallOff(), distance);
+            force += -(config.getSpringConstant() * factor) * (distance - targetDistance);
+        }
+
+        if (time > pushStartTime)
+        {
+            double factor = fallOffHelper.fallOff(this.config.getRepulsionFallOff(), distance);
+            force += this.config.getRepulsionForce() * factor;
+        }
+        return force;
     }
 }
 
