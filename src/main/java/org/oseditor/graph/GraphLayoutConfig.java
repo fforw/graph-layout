@@ -22,4 +22,6 @@ public interface GraphLayoutConfig
     FallOffCurveDefinition getSpringFallOff();
 
     FallOffCurveDefinition getRepulsionFallOff();
+
+    double getDistanceFactor();
 }

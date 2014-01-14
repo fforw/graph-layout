@@ -30,7 +30,9 @@ public class GraphLayout
 
     GraphLayout(DirectedGraph data, GraphLayoutConfig cfg)
     {
+
         super(data.getNodes().size(), cfg.getStepSize());
+
 
         if (data == null)
         {
@@ -38,6 +40,16 @@ public class GraphLayout
         }
 
         this.data = data;
+
+        if (cfg.getRepulsionFallOff() == null)
+        {
+            throw new EditorRuntimeException("No repulsion fall off defined");
+        }
+        if (cfg.getSpringFallOff() == null)
+        {
+            throw new EditorRuntimeException("No spring fall off defined");
+        }
+
         this.config = cfg;
 
         distances = new int[nodeCount][];
@@ -144,7 +156,7 @@ public class GraphLayout
 
                 for (int toIdx : edges[index])
                 {
-                    int newDistance = (int) ((dist[index] * 0.999) + this.getDistance(index, toIdx));
+                    int newDistance = (int) ((dist[index] * this.config.getDistanceFactor()) + this.getDistance(index, toIdx));
                     int oldDistance = dist[toIdx];
                     if (newDistance < oldDistance)
                     {

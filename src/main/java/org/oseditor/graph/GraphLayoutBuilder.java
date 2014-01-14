@@ -24,6 +24,8 @@ public class GraphLayoutBuilder
 
     private FallOffCurveDefinition repulsionFallOff;
 
+    private double distanceFactor = 1;
+
     @Override
     public int getIterations()
     {
@@ -101,6 +103,12 @@ public class GraphLayoutBuilder
         return repulsionFallOff;
     }
 
+    @Override
+    public double getDistanceFactor()
+    {
+        return distanceFactor;
+    }
+
     public GraphLayoutBuilder withDistanceFunction(DistanceFunction distanceFunction)
     {
         this.distanceFunction = distanceFunction;
@@ -153,16 +161,15 @@ public class GraphLayoutBuilder
         return this;
     }
 
+    public GraphLayoutBuilder withDistanceFactor(double distanceFactor)
+    {
+        this.distanceFactor = distanceFactor;
+
+        return this;
+    }
+
     public GraphLayout buildFor(DirectedGraph graph)
     {
-        if (repulsionFallOff == null)
-        {
-            throw new EditorRuntimeException("No repulsion fall off defined");
-        }
-        if (springFallOff == null)
-        {
-            throw new EditorRuntimeException("No spring fall off defined");
-        }
 
         return new GraphLayout(graph, this);
     }

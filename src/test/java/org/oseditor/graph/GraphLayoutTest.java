@@ -31,6 +31,8 @@ public class GraphLayoutTest
         DirectedGraph graphData = JSONParser.defaultJSONParser().parse(DirectedGraph.class, TEST_GRAPH_JSON);
 
         GraphLayout layout = new GraphLayoutBuilder()
+            .withSpringFallOffDistance(10)
+            .withRepulsionFallOffDistance(3)
             .withDistanceFunction(new DistanceFunction()
             {
                 @Override

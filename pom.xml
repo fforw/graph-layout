@@ -71,5 +71,19 @@
         </dependency>
 
     </dependencies>
+
+  <distributionManagement>
+    <repository>
+      <id>opensaga</id>
+      <name>OpenSAGA Release Repository</name>
+      <url>http://www.opensaga.org/maven/content/repositories/releases/</url>
+    </repository>
+
+    <snapshotRepository>
+      <id>opensaga</id>
+      <name>OpenSAGA Snapshot Repository</name>
+      <url>http://www.opensaga.org/maven/content/repositories/snapshots</url>
+    </snapshotRepository>
+  </distributionManagement>
     
 </project>
